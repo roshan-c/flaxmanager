@@ -1,54 +1,65 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { addHours } from "date-fns"
-import { v4 as uuidv4 } from "uuid"
-import type { Booking, User } from "@/lib/types"
+import { addMinutes, format, differenceInMinutes } from "date-fns"
+import type { Booking } from "@/lib/types"
 
-interface BookingFormProps {
-  users: User[]
-  selectedDate: Date
-  onAddBooking: (booking: Booking) => Promise<boolean>
+interface EditBookingFormProps {
+  bookingToEdit: Booking
+  onSaveBooking: (updatedBooking: Partial<Booking>) => Promise<boolean>
+  onCancel: () => void
 }
 
-export default function BookingForm({ users, selectedDate, onAddBooking }: BookingFormProps) {
-  const [userId, setUserId] = useState<string>(users[0].id)
-  const [hour, setHour] = useState<string>("07")
+export default function EditBookingForm({ bookingToEdit, onSaveBooking, onCancel }: EditBookingFormProps) {
+  const [hour, setHour] = useState<string>("00")
   const [minute, setMinute] = useState<string>("00")
-  const [duration, setDuration] = useState<string>("30")
-  const [purpose, setPurpose] = useState<string>("shower")
+  const [duration, setDuration] = useState<string>("30") // duration in minutes
+  const [purpose, setPurpose] = useState<string>("")
+
+  useEffect(() => {
+    if (bookingToEdit) {
+      const startDate = new Date(bookingToEdit.startTime)
+      const endDate = new Date(bookingToEdit.endTime)
+
+      setHour(format(startDate, "HH"))
+      setMinute(format(startDate, "mm"))
+      
+      const diffMins = differenceInMinutes(endDate, startDate)
+      setDuration(String(diffMins))
+      
+      setPurpose(bookingToEdit.purpose || "")
+    }
+  }, [bookingToEdit])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Create start time by setting hours and minutes on the selected date
-    const startTime = new Date(selectedDate)
-    startTime.setHours(Number.parseInt(hour, 10))
-    startTime.setMinutes(Number.parseInt(minute, 10))
+    const originalStartDate = new Date(bookingToEdit.startTime)
+    
+    // Create new start time, preserving the original date, only updating hour and minute
+    const newStartTime = new Date(originalStartDate)
+    newStartTime.setHours(Number.parseInt(hour, 10))
+    newStartTime.setMinutes(Number.parseInt(minute, 10))
+    newStartTime.setSeconds(0)
+    newStartTime.setMilliseconds(0)
 
-    // Calculate end time based on duration
-    const endTime = addHours(startTime, Number.parseInt(duration, 10) / 60)
+    // Calculate new end time based on new start time and duration
+    const newEndTime = addMinutes(newStartTime, Number.parseInt(duration, 10))
 
-    const newBooking: Booking = {
-      id: uuidv4(),
-      userId,
-      startTime,
-      endTime,
+    const updatedBookingData: Partial<Booking> = {
+      id: bookingToEdit.id,
+      startTime: newStartTime,
+      endTime: newEndTime,
       purpose,
     }
 
-    const success = await onAddBooking(newBooking)
+    const success = await onSaveBooking(updatedBookingData)
     if (success) {
-      // Reset form
-      setHour("07")
-      setMinute("00")
-      setDuration("30")
-      setPurpose("shower")
+      // Form will be closed by parent component
     }
   }
 
@@ -69,26 +80,10 @@ export default function BookingForm({ users, selectedDate, onAddBooking }: Booki
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="user">Who are you?</Label>
-        <Select value={userId} onValueChange={setUserId}>
-          <SelectTrigger id="user">
-            <SelectValue placeholder="Select user" />
-          </SelectTrigger>
-          <SelectContent>
-            {users.map((user) => (
-              <SelectItem key={user.id} value={user.id}>
-                {user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="time">Time</Label>
+        <Label htmlFor="edit-time">Time</Label>
         <input
           type="time"
-          id="time"
+          id="edit-time"
           value={`${hour}:${minute}`}
           onChange={(e) => {
             const [newHour, newMinute] = e.target.value.split(":")
@@ -100,9 +95,9 @@ export default function BookingForm({ users, selectedDate, onAddBooking }: Booki
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="duration">Duration</Label>
+        <Label htmlFor="edit-duration">Duration</Label>
         <Select value={duration} onValueChange={setDuration}>
-          <SelectTrigger id="duration">
+          <SelectTrigger id="edit-duration">
             <SelectValue placeholder="Select duration" />
           </SelectTrigger>
           <SelectContent>
@@ -116,9 +111,9 @@ export default function BookingForm({ users, selectedDate, onAddBooking }: Booki
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="purpose">Purpose</Label>
+        <Label htmlFor="edit-purpose">Purpose</Label>
         <Select value={purpose} onValueChange={setPurpose}>
-          <SelectTrigger id="purpose">
+          <SelectTrigger id="edit-purpose">
             <SelectValue placeholder="Select purpose" />
           </SelectTrigger>
           <SelectContent>
@@ -131,9 +126,14 @@ export default function BookingForm({ users, selectedDate, onAddBooking }: Booki
         </Select>
       </div>
 
-      <Button type="submit" className="w-full">
-        Book Time Slot
-      </Button>
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">
+          Save Changes
+        </Button>
+      </div>
     </form>
   )
-}
+} 

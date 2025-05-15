@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthGuard from "@/components/auth/AuthGuard";
+import SignOutButton from "@/components/auth/SignOutButton";
 // UserStatus and Link are removed as the nav bar is gone
 // import UserStatus from "@/components/auth/UserStatus"; 
 // import Link from "next/link";
@@ -29,12 +30,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
         {/* Navigation bar removed */}
-        <main className="container mx-auto p-4">
+        <main className="container mx-auto p-4 flex-grow">
           <AuthGuard>{children}</AuthGuard>
         </main>
+        <footer className="container mx-auto p-4 text-center border-t">
+          <SignOutButton />
+        </footer>
       </body>
     </html>
   );
