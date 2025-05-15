@@ -1,0 +1,20 @@
+version: '3.8' # Specifies the Docker Compose file format version
+
+services:
+  app: # You can name your service anything, e.g., 'web', 'frontend'
+    build:
+      context: . # Looks for the Dockerfile in the current directory
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000" # Maps host port 3000 to container port 3000
+    environment:
+      - NODE_ENV=production
+      # Add any other environment variables your Next.js app needs
+      # For example:
+      # - NEXT_PUBLIC_API_URL=https://your-api.com
+      # - DATABASE_URL=your_database_connection_string
+    # If you need to restart the container automatically if it fails:
+    # restart: unless-stopped
+    # If you want to use a .env file to load environment variables:
+    # env_file:
+    #   - .env 
