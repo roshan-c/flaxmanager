@@ -80,48 +80,34 @@ This document outlines the steps to integrate user accounts and push notificatio
     *   Test creating, viewing, and managing bookings.
     *   Verify RLS policies are correctly enforced (users can only see/manage their own data).
 
-## Phase 3: Push Notifications (with Supabase Edge Functions & FCM)
+## Phase 3: Slack Notifications for Bookings (via Supabase Edge Functions)
 
-1.  **Firebase Project Setup (User Task):**
-    *   User to create a new project in the [Firebase console](https://console.firebase.google.com/).
-    *   Add a Web app to the Firebase project.
-    *   Note down the Firebase configuration object (apiKey, authDomain, projectId, etc.) and provide it to the Bot for client-side setup.
-    *   Enable Firebase Cloud Messaging (FCM) API.
-    *   Generate a private key file (JSON) for the Firebase Admin SDK (for server-side use in Edge Functions). User to securely store this as a Supabase Edge Function secret.
+1.  **Slack App & Incoming Webhook Setup (User Task):**
+    *   User to create a Slack App in their workspace.
+    *   User to enable "Incoming Webhooks" for the app.
+    *   User to generate an Incoming Webhook URL for a specific channel (e.g., `#bathroom-status` or `#general`).
+    *   User to provide this Webhook URL to the Bot.
+        *   Webhook URL Provided: `https://hooks.slack.com/services/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`
 
-2.  **Install Firebase Client SDK (Bot Task):**
-    *   Bot to run `npm install firebase`.
-
-3.  **Frontend Logic for Push Permissions & Token Handling (Bot Task):**
-    *   Bot to add client-side code (e.g., in a React component or a dedicated service `lib/notificationService.ts`):
-        *   Initialize the Firebase app with credentials from User (Step 1).
-        *   Request notification permission from the user.
-        *   If permission is granted, retrieve the FCM registration token.
-        *   Create a `fcm_tokens` table in Supabase (Bot Task, via migration): `id`, `user_id` (fk to `auth.users`), `token` (text, unique), `created_at`.
-        *   Send the FCM token to a Supabase Edge Function or directly insert into the `fcm_tokens` table, associating it with the logged-in user.
-    *   Bot to create a service worker file (e.g., `public/firebase-messaging-sw.js`) to handle incoming push messages when the app is in the background/closed.
-
-4.  **Supabase Edge Function for Sending Notifications (Bot Task):**
-    *   Bot to create a Supabase Edge Function (e.g., `supabase/functions/send-reminders/index.ts`).
+2.  **Supabase Edge Function for Sending Slack Notifications (Bot Task):**
+    *   Bot to create a Supabase Edge Function (e.g., `supabase/functions/slack-booking-notifier/index.ts`).
     *   This function will:
-        *   Initialize `firebase-admin` SDK using the service account key (stored as a Supabase secret).
-        *   Query the `bookings` table for relevant upcoming slots.
-        *   Query the `fcm_tokens` table for the tokens of the users to be notified.
-        *   Construct and send push messages via FCM.
+        *   Query the `bookings` table for upcoming slots (e.g., starting in the next 5-10 minutes).
+        *   For each booking, retrieve the `user_id`. To identify the user, the function will query `auth.users` table using the `user_id` to get user's email or other identifiable information.
+        *   Format a message (e.g., "Reminder: Bathroom booking for [User Email/Identifier] from [Start Time] to [End Time] is starting soon!").
+        *   Make an HTTP POST request to the Slack Incoming Webhook URL (from Step 1) to send the message.
 
-5.  **Triggering Mechanism for Notifications (Bot Task):**
-    *   Bot to set up a cron job using Supabase's dashboard scheduler (or `pg_cron`) to invoke the `send-reminders` Edge Function periodically (e.g., every 5 minutes).
-    *   Define logic for two types of reminders:
-        *   "Your slot is starting soon."
-        *   "Another user's slot is about to begin." (Requires knowing the *current* slot holder if applicable).
+3.  **Triggering Mechanism for Notifications (Bot Task):**
+    *   Bot to guide User on setting up a cron job using Supabase's dashboard scheduler (or `pg_cron`) to invoke the `slack-booking-notifier` Edge Function periodically (e.g., every 1 or 5 minutes).
 
-6.  **Environment Variables/Secrets for Edge Function (User Task, Bot Guidance):**
-    *   User to add Firebase Admin SDK service account JSON as a secret in Supabase project settings for the Edge Function.
+4.  **Environment Variables/Secrets for Edge Function (User Task, Bot Guidance):**
+    *   User to add the Slack Webhook URL as a secret in Supabase project settings (e.g., `SLACK_WEBHOOK_URL`). The Edge Function will use this secret.
 
-7.  **Testing & Refinement (Collaborative):**
-    *   Test permission requests and token registration.
-    *   Verify notifications are received correctly (foreground, background, app closed).
-    *   Test the reminder logic for different scenarios.
+5.  **Testing & Refinement (Collaborative):**
+    *   Test that the Edge Function is triggered correctly by the cron job.
+    *   Verify that booking queries are accurate.
+    *   Confirm that Slack messages are formatted correctly and posted to the designated channel for relevant upcoming bookings.
+    *   Ensure user information is displayed appropriately and respectfully in notifications.
 
 ---
 
